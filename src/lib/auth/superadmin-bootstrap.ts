@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/audit/log";
-import { DEFAULT_ISSUE_TAGS } from "@/lib/constants";
+import { DEFAULT_ISSUE_TAGS, CAYMAN_CONSTITUENCIES } from "@/lib/constants";
 
 // Ensures a SuperAdmin user exists and reference data is seeded.
 // Called lazily from server contexts; safe to call repeatedly.
@@ -31,6 +31,7 @@ export function ensureSuperAdminBootstrap(): Promise<void> {
 async function run(): Promise<void> {
   await seedSuperAdmin();
   await seedIssueTags();
+  await seedConstituencies();
 }
 
 async function seedSuperAdmin(): Promise<void> {
@@ -131,6 +132,36 @@ async function seedSuperAdmin(): Promise<void> {
     console.warn(
       `[bootstrap] SuperAdmin created: ${email}. Temporary password: ${tempPassword}`,
     );
+  }
+}
+
+// Lazily seed the 19 Cayman Islands constituencies (post-2021 boundary
+// redistribution). Idempotent: skips constituencies whose `code` already
+// exists, so an operator who renamed or removed one won't have it
+// resurrected on the next request.
+async function seedConstituencies(): Promise<void> {
+  const existing = await prisma.constituency.findMany({
+    select: { code: true },
+  });
+  const existingCodes = new Set(existing.map((c) => c.code));
+
+  let inserted = 0;
+  for (const c of CAYMAN_CONSTITUENCIES) {
+    if (existingCodes.has(c.code)) continue;
+    await prisma.constituency
+      .create({
+        data: { name: c.name, code: c.code, island: c.island },
+      })
+      .then(() => {
+        inserted += 1;
+      })
+      .catch(() => {
+        /* race with another bootstrap request or unique-violation - safe to ignore */
+      });
+  }
+  if (inserted > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[bootstrap] seeded ${inserted} Cayman Islands constituencies`);
   }
 }
 

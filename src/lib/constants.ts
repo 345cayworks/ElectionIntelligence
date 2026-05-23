@@ -131,6 +131,43 @@ export const DEFAULT_AD_PLACEMENTS = [
   { key: "elector_profile_sidebar", description: "Sidebar slot on elector profile" },
 ];
 
+// The 19 official Cayman Islands constituencies (post-2021 boundary
+// redistribution). Lazy-seeded on first request so a fresh deploy is
+// ready to assign electors without manual data entry. Codes are URL-safe
+// slugs used for sorting and lookup; `island` separates Brac / Little
+// Cayman from Grand Cayman for reporting.
+export const CAYMAN_CONSTITUENCIES: Array<{
+  name: string;
+  code: string;
+  island: string;
+}> = [
+  // West Bay
+  { name: "West Bay North",    code: "west-bay-north",    island: "Grand Cayman" },
+  { name: "West Bay West",     code: "west-bay-west",     island: "Grand Cayman" },
+  { name: "West Bay Central",  code: "west-bay-central",  island: "Grand Cayman" },
+  { name: "West Bay South",    code: "west-bay-south",    island: "Grand Cayman" },
+  // George Town
+  { name: "George Town North",   code: "george-town-north",   island: "Grand Cayman" },
+  { name: "George Town Central", code: "george-town-central", island: "Grand Cayman" },
+  { name: "George Town West",    code: "george-town-west",    island: "Grand Cayman" },
+  { name: "George Town South",   code: "george-town-south",   island: "Grand Cayman" },
+  { name: "George Town East",    code: "george-town-east",    island: "Grand Cayman" },
+  // Red Bay
+  { name: "Red Bay", code: "red-bay", island: "Grand Cayman" },
+  // Bodden Town district
+  { name: "Prospect",          code: "prospect",          island: "Grand Cayman" },
+  { name: "Newlands",          code: "newlands",          island: "Grand Cayman" },
+  { name: "Savannah",          code: "savannah",          island: "Grand Cayman" },
+  { name: "Bodden Town West",  code: "bodden-town-west",  island: "Grand Cayman" },
+  { name: "Bodden Town East",  code: "bodden-town-east",  island: "Grand Cayman" },
+  // Other Districts (Grand Cayman)
+  { name: "North Side", code: "north-side", island: "Grand Cayman" },
+  { name: "East End",   code: "east-end",   island: "Grand Cayman" },
+  // Sister Islands
+  { name: "Cayman Brac East",                 code: "cayman-brac-east",               island: "Cayman Brac" },
+  { name: "Cayman Brac West & Little Cayman", code: "cayman-brac-west-little-cayman", island: "Cayman Brac & Little Cayman" },
+];
+
 // Quick-action button definitions reused across the field UI.
 export const QUICK_ACTIONS: Array<{
   key: string;
