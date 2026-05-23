@@ -136,18 +136,46 @@ async function seedSuperAdmin(): Promise<void> {
 }
 
 // Lazily seed the 19 Cayman Islands constituencies (post-2021 boundary
-// redistribution). Idempotent: skips constituencies whose `code` already
-// exists, so an operator who renamed or removed one won't have it
-// resurrected on the next request.
+// redistribution). Two responsibilities:
+//
+//   1. Insert any missing constituency by canonical `code`.
+//   2. Migrate older slug-coded rows (e.g. "west-bay-north") to the
+//      official short codes ("WBN") in place, by matching on `name`.
+//      This keeps existing foreign keys (electors, candidates,
+//      assignments) intact - we update the code rather than delete and
+//      re-insert.
+//
+// Idempotent: rows already at the target code are skipped, and an
+// operator who deliberately renamed or removed one is not undone.
 async function seedConstituencies(): Promise<void> {
   const existing = await prisma.constituency.findMany({
-    select: { code: true },
+    select: { id: true, name: true, code: true },
   });
-  const existingCodes = new Set(existing.map((c) => c.code));
+  const byCode = new Map(existing.map((c) => [c.code, c]));
+  const byName = new Map(existing.map((c) => [c.name.toLowerCase(), c]));
 
   let inserted = 0;
+  let renamed = 0;
+
   for (const c of CAYMAN_CONSTITUENCIES) {
-    if (existingCodes.has(c.code)) continue;
+    if (byCode.has(c.code)) continue;
+
+    // Look for an existing row with the same name but a stale code.
+    const stale = byName.get(c.name.toLowerCase());
+    if (stale && stale.code !== c.code) {
+      try {
+        await prisma.constituency.update({
+          where: { id: stale.id },
+          data: { code: c.code, island: c.island },
+        });
+        renamed += 1;
+      } catch {
+        /* unique violation if both the target code AND a same-named row
+         * already exist in some weird state - skip to avoid clobbering */
+      }
+      continue;
+    }
+
     await prisma.constituency
       .create({
         data: { name: c.name, code: c.code, island: c.island },
@@ -159,9 +187,12 @@ async function seedConstituencies(): Promise<void> {
         /* race with another bootstrap request or unique-violation - safe to ignore */
       });
   }
-  if (inserted > 0) {
+
+  if (inserted > 0 || renamed > 0) {
     // eslint-disable-next-line no-console
-    console.log(`[bootstrap] seeded ${inserted} Cayman Islands constituencies`);
+    console.log(
+      `[bootstrap] constituencies: inserted ${inserted}, renamed ${renamed}`,
+    );
   }
 }
 

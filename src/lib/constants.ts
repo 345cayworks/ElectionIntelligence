@@ -132,40 +132,41 @@ export const DEFAULT_AD_PLACEMENTS = [
 ];
 
 // The 19 official Cayman Islands constituencies (post-2021 boundary
-// redistribution). Lazy-seeded on first request so a fresh deploy is
-// ready to assign electors without manual data entry. Codes are URL-safe
-// slugs used for sorting and lookup; `island` separates Brac / Little
-// Cayman from Grand Cayman for reporting.
+// redistribution). Codes follow the short official abbreviations used
+// by the Elections Office (WBN, GTC, RED, etc.). Sister Islands codes
+// (CBE / CBW) use the same naming convention; if the official Sister
+// Islands codes differ, update this table and the bootstrap migration
+// will rename existing rows on the next request.
 export const CAYMAN_CONSTITUENCIES: Array<{
   name: string;
   code: string;
   island: string;
 }> = [
   // West Bay
-  { name: "West Bay North",    code: "west-bay-north",    island: "Grand Cayman" },
-  { name: "West Bay West",     code: "west-bay-west",     island: "Grand Cayman" },
-  { name: "West Bay Central",  code: "west-bay-central",  island: "Grand Cayman" },
-  { name: "West Bay South",    code: "west-bay-south",    island: "Grand Cayman" },
+  { name: "West Bay North",    code: "WBN", island: "Grand Cayman" },
+  { name: "West Bay Central",  code: "WBC", island: "Grand Cayman" },
+  { name: "West Bay South",    code: "WBS", island: "Grand Cayman" },
+  { name: "West Bay West",     code: "WBW", island: "Grand Cayman" },
   // George Town
-  { name: "George Town North",   code: "george-town-north",   island: "Grand Cayman" },
-  { name: "George Town Central", code: "george-town-central", island: "Grand Cayman" },
-  { name: "George Town West",    code: "george-town-west",    island: "Grand Cayman" },
-  { name: "George Town South",   code: "george-town-south",   island: "Grand Cayman" },
-  { name: "George Town East",    code: "george-town-east",    island: "Grand Cayman" },
+  { name: "George Town North",   code: "GTN", island: "Grand Cayman" },
+  { name: "George Town Central", code: "GTC", island: "Grand Cayman" },
+  { name: "George Town West",    code: "GTW", island: "Grand Cayman" },
+  { name: "George Town South",   code: "GTS", island: "Grand Cayman" },
+  { name: "George Town East",    code: "GTE", island: "Grand Cayman" },
   // Red Bay
-  { name: "Red Bay", code: "red-bay", island: "Grand Cayman" },
+  { name: "Red Bay", code: "RED", island: "Grand Cayman" },
   // Bodden Town district
-  { name: "Prospect",          code: "prospect",          island: "Grand Cayman" },
-  { name: "Newlands",          code: "newlands",          island: "Grand Cayman" },
-  { name: "Savannah",          code: "savannah",          island: "Grand Cayman" },
-  { name: "Bodden Town West",  code: "bodden-town-west",  island: "Grand Cayman" },
-  { name: "Bodden Town East",  code: "bodden-town-east",  island: "Grand Cayman" },
+  { name: "Prospect",          code: "PRO", island: "Grand Cayman" },
+  { name: "Newlands",          code: "NEW", island: "Grand Cayman" },
+  { name: "Savannah",          code: "SAV", island: "Grand Cayman" },
+  { name: "Bodden Town East",  code: "BTE", island: "Grand Cayman" },
+  { name: "Bodden Town West",  code: "BTW", island: "Grand Cayman" },
   // Other Districts (Grand Cayman)
-  { name: "North Side", code: "north-side", island: "Grand Cayman" },
-  { name: "East End",   code: "east-end",   island: "Grand Cayman" },
+  { name: "North Side", code: "NS", island: "Grand Cayman" },
+  { name: "East End",   code: "EE", island: "Grand Cayman" },
   // Sister Islands
-  { name: "Cayman Brac East",                 code: "cayman-brac-east",               island: "Cayman Brac" },
-  { name: "Cayman Brac West & Little Cayman", code: "cayman-brac-west-little-cayman", island: "Cayman Brac & Little Cayman" },
+  { name: "Cayman Brac East",                 code: "CBE", island: "Cayman Brac" },
+  { name: "Cayman Brac West & Little Cayman", code: "CBW", island: "Cayman Brac & Little Cayman" },
 ];
 
 // Quick-action button definitions reused across the field UI.
