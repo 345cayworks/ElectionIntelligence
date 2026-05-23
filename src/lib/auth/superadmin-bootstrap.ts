@@ -2,8 +2,9 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/audit/log";
+import { DEFAULT_ISSUE_TAGS } from "@/lib/constants";
 
-// Ensures a SuperAdmin user exists, seeded from SUPER_ADMIN_EMAIL.
+// Ensures a SuperAdmin user exists and reference data is seeded.
 // Called lazily from server contexts; safe to call repeatedly.
 
 let bootstrapPromise: Promise<void> | null = null;
@@ -19,7 +20,7 @@ export function ensureSuperAdminBootstrap(): Promise<void> {
       // through their own paths.
       // eslint-disable-next-line no-console
       console.warn(
-        "[bootstrap] SuperAdmin bootstrap deferred:",
+        "[bootstrap] deferred:",
         (err as Error).message,
       );
     });
@@ -28,6 +29,11 @@ export function ensureSuperAdminBootstrap(): Promise<void> {
 }
 
 async function run(): Promise<void> {
+  await seedSuperAdmin();
+  await seedIssueTags();
+}
+
+async function seedSuperAdmin(): Promise<void> {
   const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
   if (!email) return;
 
@@ -78,4 +84,34 @@ async function run(): Promise<void> {
   console.warn(
     `[bootstrap] SuperAdmin created: ${email}. Temporary password: ${tempPassword}`,
   );
+}
+
+// Lazily seed the canonical issue tags used by the field canvasser UI
+// (Cost of living, Traffic, Healthcare, etc.). Idempotent: only inserts
+// tags that don't already exist by key.
+async function seedIssueTags(): Promise<void> {
+  const existing = await prisma.issueTag.findMany({
+    select: { key: true },
+  });
+  const existingKeys = new Set(existing.map((t) => t.key));
+
+  let inserted = 0;
+  for (let i = 0; i < DEFAULT_ISSUE_TAGS.length; i++) {
+    const tag = DEFAULT_ISSUE_TAGS[i];
+    if (existingKeys.has(tag.key)) continue;
+    await prisma.issueTag
+      .create({
+        data: { key: tag.key, label: tag.label, sortOrder: i, active: true },
+      })
+      .then(() => {
+        inserted += 1;
+      })
+      .catch(() => {
+        /* race with another bootstrap request - non-critical */
+      });
+  }
+  if (inserted > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[bootstrap] seeded ${inserted} issue tag(s)`);
+  }
 }
