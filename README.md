@@ -8,9 +8,9 @@ separately.
 ## Stack
 
 - Next.js 14 (App Router) + TypeScript
-- Prisma ORM (SQLite for local dev; Postgres / Neon / Netlify Database
-  for production - change the `datasource` block in
-  `prisma/schema.prisma` and rerun `prisma db push` / `prisma migrate`)
+- Prisma ORM + **PostgreSQL** (Neon / Netlify Database / Supabase / RDS).
+  SQLite is not supported because serverless runtimes don't have a
+  writable filesystem - sign-in would crash on the first session insert.
 - Tailwind CSS
 - Server actions and `/api/*` routes
 - Cayworks platform foundation (tracking, SuperAdmin bootstrap, Ads
@@ -24,12 +24,18 @@ npm install
 
 # 2. configure
 cp .env.example .env
+# - Set DATABASE_URL to a PostgreSQL connection string. Free options:
+#     Neon (https://neon.tech) - one-click, copy the URL.
+#     Or local docker:
+#       docker run --name ei-pg -e POSTGRES_PASSWORD=postgres \
+#         -p 5432:5432 -d postgres:16
+#       DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 # - Set SUPER_ADMIN_EMAIL=you@example.com so the platform seeds your
 #   SuperAdmin on first boot.
 # - Leave SUPERADMIN_MASTER_KEY and AD_ENGINE_KEY blank if you do not
 #   need them yet. The app does not crash when they are missing.
 
-# 3. create the database
+# 3. apply the schema to your database
 npx prisma db push
 
 # 4. (optional) seed demo data

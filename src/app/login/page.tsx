@@ -16,7 +16,7 @@ export default async function LoginPage({
   const user = await getSessionUser();
   if (user) redirect("/app/dashboard");
 
-  const errorMessage = errorMessageFor(searchParams?.error);
+  const errorMessage = errorMessageFor(searchParams?.error, searchParams?.reason);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -63,7 +63,7 @@ export default async function LoginPage({
   );
 }
 
-function errorMessageFor(error?: string): string | null {
+function errorMessageFor(error?: string, reason?: string): string | null {
   if (!error) return null;
   switch (error) {
     case "invalid":
@@ -72,6 +72,17 @@ function errorMessageFor(error?: string): string | null {
       return "Your account does not have permission to access that page.";
     case "disabled":
       return "Your account is disabled. Contact a SuperAdmin.";
+    case "db":
+      switch (reason) {
+        case "db_not_initialized":
+          return "Database tables are missing. Run `prisma migrate deploy` on this environment, then try again.";
+        case "db_unreachable":
+          return "Cannot reach the database. Check DATABASE_URL and that the database is online.";
+        case "db_auth":
+          return "Database credentials were rejected. Check DATABASE_URL on this environment.";
+        default:
+          return "Database error during sign-in. Check the server logs.";
+      }
     default:
       return "Sign-in failed. Try again.";
   }

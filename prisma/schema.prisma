@@ -1,13 +1,15 @@
 // Election Intelligence + Cayworks Foundation
-// Provider: sqlite for local dev; switch `provider` to "postgresql" and
-// adjust types (e.g. Bytes -> bytea) for production deployment.
+// Production target is PostgreSQL (Neon / Netlify Database / RDS / Supabase).
+// SQLite is not supported on serverless platforms - the runtime filesystem
+// is read-only, which breaks every write (including sign-in session create).
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
