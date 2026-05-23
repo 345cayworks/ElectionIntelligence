@@ -37,6 +37,18 @@ async function seedSuperAdmin(): Promise<void> {
   const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
   if (!email) return;
 
+  // Use SUPER_ADMIN_SEED_PASSWORD if explicitly provided; otherwise
+  // fall back to SUPERADMIN_MASTER_KEY (operator choice - the master
+  // key is already a high-trust server-only secret, so reusing it as
+  // the initial password avoids juggling a second env var). Rotate from
+  // /admin/settings after first sign-in.
+  const seedPassword = (
+    process.env.SUPER_ADMIN_SEED_PASSWORD ??
+    process.env.SUPERADMIN_MASTER_KEY ??
+    ""
+  ).trim();
+  const operatorProvidedPassword = seedPassword.length >= 10;
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     if (existing.role !== "SUPER_ADMIN" || existing.status !== "ACTIVE") {
@@ -53,11 +65,40 @@ async function seedSuperAdmin(): Promise<void> {
         severity: "CRITICAL",
       });
     }
+
+    // Reset password from the env var only if the user is still in the
+    // post-bootstrap "must reset" state (i.e. they've never signed in to
+    // rotate it themselves). This makes the seed-password env var usable
+    // even when the User row was created on a previous deploy without it.
+    if (operatorProvidedPassword && existing.forcePasswordReset) {
+      const passwordHash = await hashPassword(seedPassword);
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { passwordHash },
+      });
+      await recordAudit({
+        actorUserId: null,
+        action: "superadmin.bootstrap.password_reset_from_env",
+        entityType: "User",
+        entityId: existing.id,
+        metadata: { email },
+        severity: "CRITICAL",
+      });
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[bootstrap] SuperAdmin password reset from SUPER_ADMIN_SEED_PASSWORD. Sign in, then remove the env var.`,
+      );
+    }
     return;
   }
 
-  // First-time bootstrap: create the SuperAdmin with a random temporary password.
-  const tempPassword = crypto.randomBytes(18).toString("base64url");
+  // First-time bootstrap. Use SUPER_ADMIN_SEED_PASSWORD if it's set (the
+  // operator's preferred password) and meets the minimum length; otherwise
+  // fall back to a random temp password printed to the server log.
+  const tempPassword = operatorProvidedPassword
+    ? seedPassword
+    : crypto.randomBytes(18).toString("base64url");
+  const operatorChosen = operatorProvidedPassword;
   const passwordHash = await hashPassword(tempPassword);
   const created = await prisma.user.create({
     data: {
@@ -75,15 +116,22 @@ async function seedSuperAdmin(): Promise<void> {
     action: "superadmin.bootstrap.created",
     entityType: "User",
     entityId: created.id,
-    metadata: { email },
+    metadata: { email, source: operatorChosen ? "env_seed_password" : "random" },
     severity: "CRITICAL",
   });
 
-  // Surface the temporary password only via server logs - never returned to clients.
-  // eslint-disable-next-line no-console
-  console.warn(
-    `[bootstrap] SuperAdmin created: ${email}. Temporary password: ${tempPassword}`,
-  );
+  if (operatorChosen) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[bootstrap] SuperAdmin created: ${email}. Using password from SUPER_ADMIN_SEED_PASSWORD. Rotate it via /admin/settings after first login, then remove the env var.`,
+    );
+  } else {
+    // Surface the temporary password only via server logs.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[bootstrap] SuperAdmin created: ${email}. Temporary password: ${tempPassword}`,
+    );
+  }
 }
 
 // Lazily seed the canonical issue tags used by the field canvasser UI
