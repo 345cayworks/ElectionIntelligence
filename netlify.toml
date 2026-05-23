@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Set production env vars via the Netlify dashboard, not here.
+  # Never commit secrets to this file.
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

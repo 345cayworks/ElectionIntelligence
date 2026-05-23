@@ -1,0 +1,396 @@
+// Election Intelligence + Cayworks Foundation
+// Provider: sqlite for local dev; switch `provider` to "postgresql" and
+// adjust types (e.g. Bytes -> bytea) for production deployment.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// Cayworks Foundation
+// =====================================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  passwordHash  String?
+  role          String   @default("OBSERVER_READONLY")
+  status        String   @default("ACTIVE")
+  forcePasswordReset Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+
+  sessions               Session[]
+  auditLogs              AuditLog[]              @relation("AuditActor")
+  importBatches          ImportBatch[]           @relation("ImportedBy")
+  capturedStatuses       ElectorPoliticalStatus[] @relation("CapturedBy")
+  canvassVisits          CanvassVisit[]          @relation("Canvasser")
+  assignmentsCreated     CanvassAssignment[]     @relation("AssignedBy")
+  assignmentsAssigned    CanvassAssignment[]     @relation("AssignedTo")
+  followUpsCreated       FollowUpTask[]          @relation("FollowUpCreatedBy")
+  followUpsAssigned      FollowUpTask[]          @relation("FollowUpAssignedTo")
+
+  @@index([role])
+  @@index([status])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    String?  // JSON string
+  ipAddress   String?
+  userAgent   String?
+  severity    String   @default("INFO") // INFO | WARN | SENSITIVE | CRITICAL
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([severity])
+}
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model AdPlacement {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// =====================================================================
+// Election Setup (Phase 3)
+// =====================================================================
+
+model ElectionCycle {
+  id           String   @id @default(cuid())
+  name         String
+  electionDate DateTime
+  status       String   @default("PLANNING") // PLANNING | ACTIVE | COMPLETED | ARCHIVED
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidates             Candidate[]
+  importBatches          ImportBatch[]
+  canvassVisits          CanvassVisit[]
+  electorPoliticalStatuses ElectorPoliticalStatus[]
+  assignments            CanvassAssignment[]
+  followUpTasks          FollowUpTask[]
+
+  @@index([status])
+}
+
+model Constituency {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  island    String   @default("Grand Cayman")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates             Candidate[]
+  electors               Elector[]
+  households             Household[]
+  importBatches          ImportBatch[]
+  canvassVisits          CanvassVisit[]
+  assignments            CanvassAssignment[]
+}
+
+model Candidate {
+  id                        String   @id @default(cuid())
+  electionCycleId           String
+  electionCycle             ElectionCycle @relation(fields: [electionCycleId], references: [id], onDelete: Cascade)
+  constituencyId            String
+  constituency              Constituency  @relation(fields: [constituencyId], references: [id], onDelete: Cascade)
+  name                      String
+  party                     String?
+  shorthandCode             String
+  isPrimaryCampaignCandidate Boolean @default(false)
+  notes                     String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  declarations              ElectorPoliticalStatus[]
+
+  @@unique([electionCycleId, constituencyId, shorthandCode])
+  @@index([constituencyId])
+  @@index([electionCycleId])
+}
+
+// =====================================================================
+// Elector Register (Phase 4)
+// =====================================================================
+
+model ImportBatch {
+  id                   String   @id @default(cuid())
+  electionCycleId      String?
+  electionCycle        ElectionCycle? @relation(fields: [electionCycleId], references: [id], onDelete: SetNull)
+  constituencyId       String?
+  constituency         Constituency? @relation(fields: [constituencyId], references: [id], onDelete: SetNull)
+  fileName             String
+  fileSize             Int?
+  importedByUserId     String?
+  importedBy           User?    @relation("ImportedBy", fields: [importedByUserId], references: [id], onDelete: SetNull)
+  importedAt           DateTime @default(now())
+  sourceType           String   @default("OFFICIAL_REGISTER") // OFFICIAL_REGISTER | REVISED_LIST | CAMPAIGN_SHEET
+  status               String   @default("PENDING") // PENDING | REVIEWED | COMMITTED | DISCARDED
+  committedAt          DateTime?
+  rowCount             Int      @default(0)
+  newCount             Int      @default(0)
+  movedInCount         Int      @default(0)
+  movedOutCount        Int      @default(0)
+  removedCount         Int      @default(0)
+  updatedAddressCount  Int      @default(0)
+  duplicateCount       Int      @default(0)
+  warnings             String?  // JSON string
+  rawSummary           String?  // JSON string (parsed counts, sheet names)
+  diffPreview          String?  // JSON string
+
+  electorsCreated      Elector[]
+
+  @@index([electionCycleId])
+  @@index([constituencyId])
+  @@index([importedAt])
+  @@index([status])
+}
+
+model Household {
+  id                String   @id @default(cuid())
+  constituencyId    String?
+  constituency      Constituency? @relation(fields: [constituencyId], references: [id], onDelete: SetNull)
+  streetNumber      String?
+  streetName        String?
+  streetType        String?
+  normalizedAddress String   @unique
+  latitude          Float?
+  longitude         Float?
+  buildingType      String   @default("UNKNOWN") // HOUSE | APARTMENT | COMPLEX | UNKNOWN
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  electors          Elector[]
+  visits            CanvassVisit[]
+  assignments       CanvassAssignment[]
+  followUpTasks     FollowUpTask[]
+
+  @@index([streetName])
+  @@index([constituencyId])
+}
+
+model Elector {
+  id                 String   @id @default(cuid())
+  officialSerialNo   String?
+  constituencyId     String?
+  constituency       Constituency? @relation(fields: [constituencyId], references: [id], onDelete: SetNull)
+  pollingDivision    String?
+  fullName           String
+  occupation         String?
+  currentHouseholdId String?
+  currentHousehold   Household? @relation(fields: [currentHouseholdId], references: [id], onDelete: SetNull)
+  officialStatus     String   @default("ACTIVE") // ACTIVE | NEW | REMOVED | MOVED_OUT | MOVED_IN | ADDRESS_UPDATED
+  sourceImportBatchId String?
+  sourceImportBatch  ImportBatch? @relation(fields: [sourceImportBatchId], references: [id], onDelete: SetNull)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  contacts           ElectorContact[]
+  politicalStatuses  ElectorPoliticalStatus[]
+  canvassVisits      CanvassVisit[]
+  issues             ElectorIssue[]
+  followUpTasks      FollowUpTask[]
+
+  @@index([fullName])
+  @@index([officialSerialNo])
+  @@index([currentHouseholdId])
+  @@index([constituencyId])
+  @@index([officialStatus])
+}
+
+model ElectorContact {
+  id          String   @id @default(cuid())
+  electorId   String
+  elector     Elector  @relation(fields: [electorId], references: [id], onDelete: Cascade)
+  contactType String   // PHONE | EMAIL | WHATSAPP | OTHER
+  value       String
+  consentNotes String?
+  source      String?  // CAMPAIGN_INPUT | UPLOADED | SELF_REPORTED
+  capturedByUserId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([electorId])
+  @@index([contactType])
+}
+
+// =====================================================================
+// Canvassing (Phase 6)
+// =====================================================================
+
+model CanvassVisit {
+  id               String   @id @default(cuid())
+  electionCycleId  String?
+  electionCycle    ElectionCycle? @relation(fields: [electionCycleId], references: [id], onDelete: SetNull)
+  constituencyId   String?
+  constituency     Constituency? @relation(fields: [constituencyId], references: [id], onDelete: SetNull)
+  householdId      String?
+  household        Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  electorId        String?
+  elector          Elector?  @relation(fields: [electorId], references: [id], onDelete: SetNull)
+  canvasserId      String?
+  canvasser        User?     @relation("Canvasser", fields: [canvasserId], references: [id], onDelete: SetNull)
+  visitDate        DateTime  @default(now())
+  visitMethod      String    @default("DOOR") // DOOR | PHONE | WHATSAPP | EVENT | OFFICE
+  result           String    @default("SPOKE") // SPOKE | NOT_HOME | REFUSED | MOVED | DECEASED_VERIFY | WRONG_ADDRESS
+  notes            String?
+  followUpRequired Boolean   @default(false)
+  followUpDate     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([householdId])
+  @@index([electorId])
+  @@index([canvasserId])
+  @@index([visitDate])
+  @@index([result])
+}
+
+model ElectorPoliticalStatus {
+  id                  String   @id @default(cuid())
+  electorId           String
+  elector             Elector  @relation(fields: [electorId], references: [id], onDelete: Cascade)
+  electionCycleId     String?
+  electionCycle       ElectionCycle? @relation(fields: [electionCycleId], references: [id], onDelete: SetNull)
+  declaredPosition    String   // SUPPORTS_US | SUPPORTS_OPPONENT | UNDECIDED | NOT_VOTING | UNKNOWN | REFUSED
+  declaredCandidateId String?
+  declaredCandidate   Candidate? @relation(fields: [declaredCandidateId], references: [id], onDelete: SetNull)
+  votingMethodFlag    String   @default("UNKNOWN") // ORDINARY | POSTAL | MOBILE | UNKNOWN
+  confidenceLevel    String    @default("UNKNOWN") // DIRECT_STATEMENT | CANVASSER_OBSERVATION | THIRD_PARTY | UNKNOWN
+  notes              String?
+  capturedByUserId   String?
+  capturedBy         User?    @relation("CapturedBy", fields: [capturedByUserId], references: [id], onDelete: SetNull)
+  capturedAt         DateTime @default(now())
+  lastUpdatedAt      DateTime @updatedAt
+  isCurrent          Boolean  @default(true)
+
+  @@index([electorId])
+  @@index([electionCycleId])
+  @@index([declaredPosition])
+  @@index([votingMethodFlag])
+}
+
+model IssueTag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  label       String
+  description String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+
+  electorIssues ElectorIssue[]
+}
+
+model ElectorIssue {
+  id           String   @id @default(cuid())
+  electorId    String
+  elector      Elector  @relation(fields: [electorId], references: [id], onDelete: Cascade)
+  issueTagId   String
+  issueTag     IssueTag @relation(fields: [issueTagId], references: [id], onDelete: Cascade)
+  notes        String?
+  capturedByUserId String?
+  createdAt    DateTime @default(now())
+
+  @@unique([electorId, issueTagId])
+  @@index([issueTagId])
+}
+
+model FollowUpTask {
+  id               String   @id @default(cuid())
+  electionCycleId  String?
+  electionCycle    ElectionCycle? @relation(fields: [electionCycleId], references: [id], onDelete: SetNull)
+  electorId        String?
+  elector          Elector?  @relation(fields: [electorId], references: [id], onDelete: SetNull)
+  householdId      String?
+  household        Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  title            String
+  description      String?
+  dueDate          DateTime?
+  status           String   @default("OPEN") // OPEN | IN_PROGRESS | DONE | CANCELLED
+  priority         String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  assignedToUserId String?
+  assignedTo       User?    @relation("FollowUpAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdByUserId  String?
+  createdBy        User?    @relation("FollowUpCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  completedAt      DateTime?
+
+  @@index([assignedToUserId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// =====================================================================
+// Assignments (Phase 8)
+// =====================================================================
+
+model CanvassAssignment {
+  id               String   @id @default(cuid())
+  electionCycleId  String?
+  electionCycle    ElectionCycle? @relation(fields: [electionCycleId], references: [id], onDelete: SetNull)
+  constituencyId   String?
+  constituency     Constituency? @relation(fields: [constituencyId], references: [id], onDelete: SetNull)
+  householdId      String?
+  household        Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  streetName       String?
+  streetType       String?
+  assignedToUserId String?
+  assignedTo       User?    @relation("AssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedByUserId String?
+  assignedBy       User?    @relation("AssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+  status           String   @default("UNASSIGNED") // UNASSIGNED | ASSIGNED | IN_PROGRESS | COMPLETED | NEEDS_REVISIT
+  priority         String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  dueDate          DateTime?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([assignedToUserId])
+  @@index([householdId])
+  @@index([status])
+  @@index([streetName])
+}
