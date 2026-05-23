@@ -69,9 +69,11 @@ export async function POST(req: NextRequest) {
       duplicateCount: diff.summary.duplicateCount,
       warnings: warnings.length ? JSON.stringify(warnings) : null,
       rawSummary: JSON.stringify({ sheets: parsed.sheets, totalParsed: parsed.rows.length }),
+      // Persist the full diff so commit applies every row. The review UI
+      // renders only a window of these records; the rest stay on disk so
+      // commit is never silently truncated.
       diffPreview: JSON.stringify({
-        records: diff.records.slice(0, 200),
-        truncated: diff.records.length > 200,
+        records: diff.records,
         totalRecords: diff.records.length,
       }),
     },

@@ -13,7 +13,15 @@ export function ensureSuperAdminBootstrap(): Promise<void> {
     bootstrapPromise = run().catch((err) => {
       // Reset so a future request can retry.
       bootstrapPromise = null;
-      throw err;
+      // Never surface this error to the caller. If the DB isn't ready
+      // (e.g. `prisma db push` hasn't been run yet), we want callers to
+      // continue rendering and let other database calls fail gracefully
+      // through their own paths.
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[bootstrap] SuperAdmin bootstrap deferred:",
+        (err as Error).message,
+      );
     });
   }
   return bootstrapPromise;

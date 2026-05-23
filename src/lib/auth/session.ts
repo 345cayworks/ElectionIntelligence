@@ -48,14 +48,32 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const token = cookies().get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const session = await prisma.session.findUnique({
-    where: { token },
-    include: { user: true },
-  });
+  let session;
+  try {
+    session = await prisma.session.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+  } catch (err) {
+    // If the database isn't initialized yet (Prisma P2021), treat the
+    // request as unauthenticated rather than crashing the page.
+    const code = (err as { code?: string }).code;
+    if (code === "P2021" || code === "P1001" || code === "P1003") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[session] database unavailable, treating session as anonymous:",
+        (err as Error).message,
+      );
+      return null;
+    }
+    throw err;
+  }
 
   if (!session) return null;
   if (session.expiresAt < new Date()) {
-    await prisma.session.deleteMany({ where: { token } });
+    await prisma.session.deleteMany({ where: { token } }).catch(() => {
+      /* best-effort cleanup */
+    });
     return null;
   }
   if (session.user.status !== "ACTIVE") return null;

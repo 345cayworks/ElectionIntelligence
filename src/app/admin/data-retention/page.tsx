@@ -88,8 +88,11 @@ export default async function DataRetentionPage({
         <CardBody>
           <form action={archiveOldVisits} className="space-y-2 text-sm">
             <p className="text-xs text-gray-600">
-              Mark canvass visits older than the configured retention period as archived.
-              This does not delete them - it sets the result to <code>ARCHIVED</code>.
+              Tag canvass visits older than the configured retention period
+              as archived. This does not delete the row, change the result,
+              or touch canvasser-entered notes - it only sets
+              <code className="mx-1">archivedAt</code> so reports can hide
+              old visits.
             </p>
             <Button type="submit" variant="outline">
               Run visit archive
@@ -128,9 +131,11 @@ async function archiveOldVisits() {
   const user = await requireAdmin();
   const visitDays = await getSetting<number>(SETTING_KEYS.RETENTION_VISIT_DAYS, 730);
   const cutoff = new Date(Date.now() - visitDays * 24 * 60 * 60 * 1000);
+  // Tag visits as archived without destroying canvasser notes. Downstream
+  // queries can filter `archivedAt: null` to hide them from active views.
   const result = await prisma.canvassVisit.updateMany({
-    where: { visitDate: { lt: cutoff } },
-    data: { notes: { set: "[archived]" } },
+    where: { visitDate: { lt: cutoff }, archivedAt: null },
+    data: { archivedAt: new Date() },
   });
   await recordAudit({
     actorUserId: user.id,

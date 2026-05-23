@@ -24,7 +24,8 @@ export default async function ImportReviewPage({
   const batch = await prisma.importBatch.findUnique({ where: { id: params.id } });
   if (!batch) notFound();
 
-  const preview = batch.diffPreview
+  const PREVIEW_WINDOW = 200;
+  const persisted = batch.diffPreview
     ? (JSON.parse(batch.diffPreview) as {
         records: Array<{
           status: string;
@@ -37,9 +38,15 @@ export default async function ImportReviewPage({
             streetType: string | null;
           };
         }>;
-        truncated: boolean;
-        totalRecords: number;
+        totalRecords?: number;
       })
+    : null;
+  const preview = persisted
+    ? {
+        records: persisted.records.slice(0, PREVIEW_WINDOW),
+        truncated: persisted.records.length > PREVIEW_WINDOW,
+        totalRecords: persisted.totalRecords ?? persisted.records.length,
+      }
     : null;
 
   return (
@@ -80,7 +87,11 @@ export default async function ImportReviewPage({
 
       <Card>
         <CardHeader
-          title={`Diff preview${preview?.truncated ? " (first 200 rows)" : ""}`}
+          title={
+            preview
+              ? `Diff preview - showing ${preview.records.length} of ${preview.totalRecords} rows`
+              : "Diff preview"
+          }
         />
         <CardBody>
           {!preview || preview.records.length === 0 ? (

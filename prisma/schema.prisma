@@ -279,6 +279,7 @@ model CanvassVisit {
   notes            String?
   followUpRequired Boolean   @default(false)
   followUpDate     DateTime?
+  archivedAt       DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -287,6 +288,7 @@ model CanvassVisit {
   @@index([canvasserId])
   @@index([visitDate])
   @@index([result])
+  @@index([archivedAt])
 }
 
 model ElectorPoliticalStatus {
