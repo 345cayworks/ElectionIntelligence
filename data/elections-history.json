@@ -1,0 +1,140 @@
+{
+  "_doc": "Historical Cayman Islands General Elections. Each cycle uses the post-2017 single-member constituencies (same 19 boundaries used in 2021 and 2025). Candidate arrays are placeholders - fill them in from official Declarations of Results, the Wikipedia article 'Elections in the Cayman Islands', or news outlets (Cayman News Service, Cayman Compass). Re-clicking the import button is safe: idempotent upserts by (electionCycleId, constituencyId, shorthandCode).",
+  "cycles": [
+    {
+      "id": "ge-2021",
+      "name": "2021 General Election",
+      "electionDate": "2021-04-14",
+      "status": "COMPLETED",
+      "notes": "First election under the 19 single-member constituency boundaries. PACT coalition formed by Wayne Panton.",
+      "constituencies": [
+        {
+          "code": "WBN",
+          "candidates": []
+        },
+        {
+          "code": "WBC",
+          "candidates": []
+        },
+        {
+          "code": "WBS",
+          "candidates": []
+        },
+        {
+          "code": "WBW",
+          "candidates": []
+        },
+        {
+          "code": "GTN",
+          "candidates": []
+        },
+        {
+          "code": "GTC",
+          "candidates": []
+        },
+        {
+          "code": "GTW",
+          "candidates": []
+        },
+        {
+          "code": "GTS",
+          "candidates": []
+        },
+        {
+          "code": "GTE",
+          "candidates": []
+        },
+        {
+          "code": "RED",
+          "candidates": []
+        },
+        {
+          "code": "PRO",
+          "candidates": []
+        },
+        {
+          "code": "NEW",
+          "candidates": [
+            {
+              "name": "Wayne Panton",
+              "shorthandCode": "WP",
+              "partyCode": null,
+              "isWinner": true,
+              "notes": "Won as Independent; became Premier of PACT coalition."
+            }
+          ]
+        },
+        {
+          "code": "SAV",
+          "candidates": []
+        },
+        {
+          "code": "BTE",
+          "candidates": []
+        },
+        {
+          "code": "BTW",
+          "candidates": []
+        },
+        {
+          "code": "NS",
+          "candidates": []
+        },
+        {
+          "code": "EE",
+          "candidates": [
+            {
+              "name": "Isaac Rankine",
+              "shorthandCode": "IR",
+              "partyCode": null,
+              "isWinner": true
+            }
+          ]
+        },
+        {
+          "code": "CBE",
+          "candidates": [
+            {
+              "name": "Juliana O'Connor-Connolly",
+              "shorthandCode": "JOC",
+              "partyCode": "PPM",
+              "isWinner": true
+            }
+          ]
+        },
+        {
+          "code": "CBW",
+          "candidates": []
+        }
+      ]
+    },
+    {
+      "id": "ge-2017",
+      "name": "2017 General Election",
+      "electionDate": "2017-05-24",
+      "status": "COMPLETED",
+      "notes": "First election under the 19 single-member constituency boundaries (replaced the earlier multi-member districts). Alden McLaughlin's PPM returned to government in coalition.",
+      "constituencies": [
+        { "code": "WBN", "candidates": [] },
+        { "code": "WBC", "candidates": [] },
+        { "code": "WBS", "candidates": [] },
+        { "code": "WBW", "candidates": [] },
+        { "code": "GTN", "candidates": [] },
+        { "code": "GTC", "candidates": [] },
+        { "code": "GTW", "candidates": [] },
+        { "code": "GTS", "candidates": [] },
+        { "code": "GTE", "candidates": [] },
+        { "code": "RED", "candidates": [] },
+        { "code": "PRO", "candidates": [] },
+        { "code": "NEW", "candidates": [] },
+        { "code": "SAV", "candidates": [] },
+        { "code": "BTE", "candidates": [] },
+        { "code": "BTW", "candidates": [] },
+        { "code": "NS", "candidates": [] },
+        { "code": "EE", "candidates": [] },
+        { "code": "CBE", "candidates": [] },
+        { "code": "CBW", "candidates": [] }
+      ]
+    }
+  ]
+}

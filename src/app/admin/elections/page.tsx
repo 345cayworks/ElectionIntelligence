@@ -13,26 +13,40 @@ import { Table, THead, TH, TBody, TR, TD, EmptyState } from "@/components/ui/Tab
 import { StatusBadge } from "@/components/ui/Badge";
 import { ELECTION_STATUSES } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import importDataRaw from "../../../../data/2025-general-election.json";
+import { importCycle, type ImportCycle } from "@/lib/elections-import";
+import data2025Raw from "../../../../data/2025-general-election.json";
+import historyRaw from "../../../../data/elections-history.json";
 
-interface ImportCandidate {
-  name: string;
-  shorthandCode: string;
-  partyCode: string | null;
-  votes: number | null;
-  votesPercent?: number | null;
-  rank?: number | null;
-  isWinner?: boolean;
+interface Data2025 {
+  cycle: {
+    name: string;
+    electionDate: string;
+    status?: string;
+    notes?: string | null;
+  };
+  constituencies: ImportCycle["constituencies"];
 }
-interface ImportConstituency {
-  code: string;
-  candidates?: ImportCandidate[];
+const data2025 = data2025Raw as unknown as Data2025;
+const data2025Cycle: ImportCycle = {
+  id: "ge-2025",
+  name: data2025.cycle.name,
+  electionDate: data2025.cycle.electionDate,
+  status: data2025.cycle.status,
+  notes: data2025.cycle.notes,
+  constituencies: data2025.constituencies,
+};
+
+interface HistoryFile {
+  cycles: ImportCycle[];
 }
-interface ImportFile {
-  cycle: { name: string; electionDate: string; status?: string; notes?: string | null };
-  constituencies: ImportConstituency[];
+const history = historyRaw as unknown as HistoryFile;
+
+function totalCandidates(c: ImportCycle): number {
+  return c.constituencies.reduce(
+    (acc, x) => acc + (x.candidates?.length ?? 0),
+    0,
+  );
 }
-const importData = importDataRaw as unknown as ImportFile;
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +70,9 @@ export default async function ElectionsPage({
     include: { _count: { select: { candidates: true, importBatches: true } } },
   });
 
-  const totalCandidatesIn2025 = importData.constituencies.reduce(
-    (acc, c) => acc + (c.candidates?.length ?? 0),
+  const totalCandidatesIn2025 = totalCandidates(data2025Cycle);
+  const totalCandidatesInHistory = history.cycles.reduce(
+    (acc, c) => acc + totalCandidates(c),
     0,
   );
 
@@ -118,30 +133,55 @@ export default async function ElectionsPage({
 
         <div className="space-y-6">
           {showImportButton ? (
-            <Card>
-              <CardHeader title="Import 2025 General Election" />
-              <CardBody>
-                <p className="text-xs text-gray-600">
-                  Idempotent. Re-running updates existing rows by (cycle +
-                  constituency + shorthandCode). Currently the JSON template
-                  has <strong>{totalCandidatesIn2025} candidate(s)</strong> across{" "}
-                  <strong>{importData.constituencies.length} constituency entries</strong>.
-                </p>
-                <p className="mt-2 text-xs text-gray-500">
-                  Edit{" "}
-                  <code className="rounded bg-gray-100 px-1 py-0.5">
-                    data/2025-general-election.json
-                  </code>{" "}
-                  in the repo to add the rest of the 80 candidates before
-                  running again.
-                </p>
-                <form action={runImport2025} className="mt-3">
-                  <Button type="submit" variant="outline">
-                    Import 2025 data now
-                  </Button>
-                </form>
-              </CardBody>
-            </Card>
+            <>
+              <Card>
+                <CardHeader title="Import 2025 General Election" />
+                <CardBody>
+                  <p className="text-xs text-gray-600">
+                    Idempotent. Re-running updates existing rows by (cycle +
+                    constituency + shorthandCode). JSON template currently
+                    has <strong>{totalCandidatesIn2025} candidate(s)</strong>.
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Edit{" "}
+                    <code className="rounded bg-gray-100 px-1 py-0.5">
+                      data/2025-general-election.json
+                    </code>{" "}
+                    to add the rest of the 80 candidates.
+                  </p>
+                  <form action={runImport2025} className="mt-3">
+                    <Button type="submit" variant="outline">
+                      Import 2025 data now
+                    </Button>
+                  </form>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Import historical cycles (2021 + 2017)" />
+                <CardBody>
+                  <p className="text-xs text-gray-600">
+                    Creates {history.cycles.length} prior cycles with the same
+                    19-constituency framework. Currently{" "}
+                    <strong>{totalCandidatesInHistory} candidate(s)</strong>{" "}
+                    filled in - add more by editing{" "}
+                    <code className="rounded bg-gray-100 px-1 py-0.5">
+                      data/elections-history.json
+                    </code>
+                    .
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Useful for incumbent / margin / turnout analysis once
+                    candidate data is filled in.
+                  </p>
+                  <form action={runImportHistory} className="mt-3">
+                    <Button type="submit" variant="outline">
+                      Import historical cycles
+                    </Button>
+                  </form>
+                </CardBody>
+              </Card>
+            </>
           ) : null}
 
           <Card>
@@ -176,7 +216,26 @@ export default async function ElectionsPage({
   );
 }
 
-const IMPORT_CYCLE_ID = "ge-2025";
+function summaryToBanner(
+  s: {
+    cycleName: string;
+    candidatesInserted: number;
+    candidatesUpdated: number;
+    resultsRecorded: number;
+    skippedConstituencyCodes: string[];
+  },
+): string {
+  const parts = [
+    `"${s.cycleName}":`,
+    `${s.candidatesInserted} candidate(s) created`,
+    `${s.candidatesUpdated} updated`,
+    `${s.resultsRecorded} result(s) recorded`,
+  ];
+  if (s.skippedConstituencyCodes.length > 0) {
+    parts.push(`skipped: ${s.skippedConstituencyCodes.join(", ")}`);
+  }
+  return parts.join(", ");
+}
 
 async function runImport2025(): Promise<void> {
   "use server";
@@ -184,139 +243,54 @@ async function runImport2025(): Promise<void> {
   if (!isSuperAdmin(actor)) {
     redirect(`/admin/elections?error=${encodeURIComponent("SuperAdmin only.")}`);
   }
-
   try {
-    const cycle = await prisma.electionCycle.upsert({
-      where: { id: IMPORT_CYCLE_ID },
-      update: {
-        name: importData.cycle.name,
-        electionDate: new Date(importData.cycle.electionDate),
-        status: importData.cycle.status ?? "COMPLETED",
-        notes: importData.cycle.notes ?? null,
-      },
-      create: {
-        id: IMPORT_CYCLE_ID,
-        name: importData.cycle.name,
-        electionDate: new Date(importData.cycle.electionDate),
-        status: importData.cycle.status ?? "COMPLETED",
-        notes: importData.cycle.notes ?? null,
-      },
-    });
-
-    const constituencies = await prisma.constituency.findMany();
-    const byCode = new Map(constituencies.map((c) => [c.code, c]));
-    const parties = await prisma.party.findMany();
-    const partyByCode = new Map(parties.map((p) => [p.code, p]));
-
-    let candidatesInserted = 0;
-    let candidatesUpdated = 0;
-    let resultsRecorded = 0;
-    const skipped: string[] = [];
-
-    for (const entry of importData.constituencies) {
-      const constituency = byCode.get(entry.code);
-      if (!constituency) {
-        skipped.push(entry.code);
-        continue;
-      }
-      for (const candidateInput of entry.candidates ?? []) {
-        const partyId = candidateInput.partyCode
-          ? partyByCode.get(candidateInput.partyCode)?.id ?? null
-          : null;
-
-        const key = {
-          electionCycleId: cycle.id,
-          constituencyId: constituency.id,
-          shorthandCode: candidateInput.shorthandCode,
-        };
-        const existing = await prisma.candidate.findUnique({
-          where: { electionCycleId_constituencyId_shorthandCode: key },
-        });
-        const candidate = existing
-          ? await prisma.candidate.update({
-              where: { id: existing.id },
-              data: {
-                name: candidateInput.name,
-                partyId,
-                partyName:
-                  !partyId && candidateInput.partyCode
-                    ? candidateInput.partyCode
-                    : null,
-              },
-            })
-          : await prisma.candidate.create({
-              data: {
-                ...key,
-                name: candidateInput.name,
-                partyId,
-                partyName:
-                  !partyId && candidateInput.partyCode
-                    ? candidateInput.partyCode
-                    : null,
-              },
-            });
-
-        if (existing) candidatesUpdated += 1;
-        else candidatesInserted += 1;
-
-        if (candidateInput.votes !== null && candidateInput.votes !== undefined) {
-          await prisma.electionResult.upsert({
-            where: {
-              electionCycleId_candidateId: {
-                electionCycleId: cycle.id,
-                candidateId: candidate.id,
-              },
-            },
-            update: {
-              votesReceived: candidateInput.votes,
-              votesPercent: candidateInput.votesPercent ?? null,
-              isWinner: candidateInput.isWinner ?? false,
-              source: "admin_button_2025",
-            },
-            create: {
-              electionCycleId: cycle.id,
-              constituencyId: constituency.id,
-              candidateId: candidate.id,
-              votesReceived: candidateInput.votes,
-              votesPercent: candidateInput.votesPercent ?? null,
-              isWinner: candidateInput.isWinner ?? false,
-              source: "admin_button_2025",
-            },
-          });
-          resultsRecorded += 1;
-        }
-      }
-    }
-
+    const summary = await importCycle(data2025Cycle, "admin_button_2025");
     await recordAudit({
       actorUserId: actor.id,
-      action: "election_cycle.import_2025",
+      action: "election_cycle.import",
       entityType: "ElectionCycle",
-      entityId: cycle.id,
-      metadata: {
-        candidatesInserted,
-        candidatesUpdated,
-        resultsRecorded,
-        skippedConstituencies: skipped,
-      },
+      entityId: summary.cycleId,
+      metadata: { ...summary, source: "button_2025" },
       severity: "WARN",
     });
-
     revalidatePath("/admin/elections");
     revalidatePath("/admin/candidates");
-
-    const parts = [
-      `Imported "${cycle.name}".`,
-      `${candidatesInserted} candidate(s) created`,
-      `${candidatesUpdated} updated`,
-      `${resultsRecorded} result(s) recorded`,
-    ];
-    if (skipped.length > 0) {
-      parts.push(`skipped constituency codes: ${skipped.join(", ")}`);
-    }
-    redirect(`/admin/elections?notice=${encodeURIComponent(parts.join(". "))}`);
+    redirect(
+      `/admin/elections?notice=${encodeURIComponent("Imported " + summaryToBanner(summary))}`,
+    );
   } catch (err) {
-    // redirect() throws internally; let it propagate.
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const msg = err instanceof Error ? err.message : "Import failed";
+    redirect(`/admin/elections?error=${encodeURIComponent(`Import failed: ${msg}`)}`);
+  }
+}
+
+async function runImportHistory(): Promise<void> {
+  "use server";
+  const actor = await requireCampaignManager();
+  if (!isSuperAdmin(actor)) {
+    redirect(`/admin/elections?error=${encodeURIComponent("SuperAdmin only.")}`);
+  }
+  try {
+    const summaries: string[] = [];
+    for (const c of history.cycles) {
+      const summary = await importCycle(c, "admin_button_history");
+      await recordAudit({
+        actorUserId: actor.id,
+        action: "election_cycle.import",
+        entityType: "ElectionCycle",
+        entityId: summary.cycleId,
+        metadata: { ...summary, source: "button_history" },
+        severity: "WARN",
+      });
+      summaries.push(summaryToBanner(summary));
+    }
+    revalidatePath("/admin/elections");
+    revalidatePath("/admin/candidates");
+    redirect(
+      `/admin/elections?notice=${encodeURIComponent("Imported " + summaries.join(" | "))}`,
+    );
+  } catch (err) {
     if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     const msg = err instanceof Error ? err.message : "Import failed";
     redirect(`/admin/elections?error=${encodeURIComponent(`Import failed: ${msg}`)}`);

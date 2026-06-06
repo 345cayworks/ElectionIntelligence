@@ -1,0 +1,72 @@
+{
+  "_doc": "Polling stations per constituency. Source: portal.elections.ky/where-how-to-vote/where-to-vote published for each election cycle. The list ships with a handful of well-known venues so the import demonstrates the wiring; fill in the rest from the current cycle's official polling-station notice before going operational. Idempotent: re-running the importer upserts by (constituencyCode, name).",
+  "stations": [
+    {
+      "constituencyCode": "WBN",
+      "name": "West Bay Civic Centre",
+      "city": "West Bay"
+    },
+    {
+      "constituencyCode": "WBC",
+      "name": "Sir John A. Cumber Primary School",
+      "city": "West Bay"
+    },
+    {
+      "constituencyCode": "GTN",
+      "name": "George Town Town Hall",
+      "city": "George Town"
+    },
+    {
+      "constituencyCode": "GTC",
+      "name": "George Hicks High School",
+      "address": "Walkers Road",
+      "city": "George Town"
+    },
+    {
+      "constituencyCode": "GTE",
+      "name": "John Gray High School",
+      "address": "Walkers Road",
+      "city": "George Town"
+    },
+    {
+      "constituencyCode": "RED",
+      "name": "Red Bay Primary School",
+      "city": "Red Bay"
+    },
+    {
+      "constituencyCode": "PRO",
+      "name": "Prospect Primary School",
+      "city": "Prospect"
+    },
+    {
+      "constituencyCode": "BTE",
+      "name": "Bodden Town Civic Centre",
+      "city": "Bodden Town"
+    },
+    {
+      "constituencyCode": "BTW",
+      "name": "Theoline L. McCoy Primary School",
+      "city": "Bodden Town"
+    },
+    {
+      "constituencyCode": "NS",
+      "name": "North Side Civic Centre",
+      "city": "North Side"
+    },
+    {
+      "constituencyCode": "EE",
+      "name": "East End Civic Centre",
+      "city": "East End"
+    },
+    {
+      "constituencyCode": "CBE",
+      "name": "Aston Rutty Civic Centre",
+      "city": "Cayman Brac (Stake Bay)"
+    },
+    {
+      "constituencyCode": "CBW",
+      "name": "Little Cayman Civic Centre",
+      "city": "Little Cayman"
+    }
+  ]
+}

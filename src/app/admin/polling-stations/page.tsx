@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireCampaignManager } from "@/lib/auth/guards";
+import { isSuperAdmin } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit/log";
 import { PageHeader } from "@/components/layout/SidebarLayout";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -10,6 +11,16 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label, Field, Select, Textarea } from "@/components/ui/Input";
 import { Table, THead, TH, TBody, TR, TD, EmptyState } from "@/components/ui/Table";
 import { Badge } from "@/components/ui/Badge";
+import {
+  importPollingStations,
+  type ImportPollingStation,
+} from "@/lib/elections-import";
+import stationsRaw from "../../../../data/polling-stations.json";
+
+interface StationsFile {
+  stations: ImportPollingStation[];
+}
+const stationsData = stationsRaw as unknown as StationsFile;
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +38,8 @@ export default async function PollingStationsPage({
 }: {
   searchParams?: { notice?: string; error?: string };
 }) {
-  await requireCampaignManager();
+  const actor = await requireCampaignManager();
+  const showImportButton = isSuperAdmin(actor);
 
   const [stations, constituencies] = await Promise.all([
     prisma.pollingStation.findMany({
@@ -105,6 +117,33 @@ export default async function PollingStationsPage({
             </CardBody>
           </Card>
         </div>
+        <div className="space-y-6">
+          {showImportButton ? (
+            <Card>
+              <CardHeader title="Import polling stations" />
+              <CardBody>
+                <p className="text-xs text-gray-600">
+                  Bulk-import from{" "}
+                  <code className="rounded bg-gray-100 px-1 py-0.5">
+                    data/polling-stations.json
+                  </code>
+                  . Idempotent - upserts by (constituencyCode + name).
+                  Currently <strong>{stationsData.stations.length}</strong>{" "}
+                  entries in the JSON.
+                </p>
+                <p className="mt-2 text-xs text-gray-500">
+                  Source: portal.elections.ky/where-how-to-vote. Update the
+                  JSON file from the current cycle&apos;s official notice before
+                  re-running.
+                </p>
+                <form action={runImportStations} className="mt-3">
+                  <Button type="submit" variant="outline">
+                    Import polling stations
+                  </Button>
+                </form>
+              </CardBody>
+            </Card>
+          ) : null}
         <Card>
           <CardHeader title="New polling station" />
           <CardBody>
@@ -146,9 +185,48 @@ export default async function PollingStationsPage({
             )}
           </CardBody>
         </Card>
+        </div>
       </div>
     </div>
   );
+}
+
+async function runImportStations(): Promise<void> {
+  "use server";
+  const actor = await requireCampaignManager();
+  if (!isSuperAdmin(actor)) {
+    redirect(
+      `/admin/polling-stations?error=${encodeURIComponent("SuperAdmin only.")}`,
+    );
+  }
+  try {
+    const summary = await importPollingStations(stationsData.stations);
+    await recordAudit({
+      actorUserId: actor.id,
+      action: "polling_station.import",
+      metadata: { ...summary, source: "button" },
+      severity: "WARN",
+    });
+    revalidatePath("/admin/polling-stations");
+    const parts = [
+      `${summary.inserted} created`,
+      `${summary.updated} updated`,
+    ];
+    if (summary.skipped > 0) {
+      parts.push(
+        `${summary.skipped} skipped (unknown constituency codes: ${summary.skippedCodes.join(", ")})`,
+      );
+    }
+    redirect(
+      `/admin/polling-stations?notice=${encodeURIComponent("Imported polling stations: " + parts.join(", "))}`,
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const msg = err instanceof Error ? err.message : "Import failed";
+    redirect(
+      `/admin/polling-stations?error=${encodeURIComponent(`Import failed: ${msg}`)}`,
+    );
+  }
 }
 
 async function createStation(formData: FormData) {
