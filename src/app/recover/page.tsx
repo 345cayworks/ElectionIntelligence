@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/audit/log";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Field } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +70,7 @@ export default async function RecoverPage({
               label={<Label>Master key</Label>}
               hint="The value currently stored in SUPERADMIN_MASTER_KEY on Netlify."
             >
-              <Input
-                type="password"
+              <PasswordInput
                 name="masterKey"
                 required
                 autoComplete="off"

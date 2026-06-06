@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Field } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { getSessionUser } from "@/lib/auth/session";
 import { ensureSuperAdminBootstrap } from "@/lib/auth/superadmin-bootstrap";
 import { env } from "@/lib/env";
@@ -41,8 +42,7 @@ export default async function LoginPage({
             />
           </Field>
           <Field label={<Label>Password</Label>}>
-            <Input
-              type="password"
+            <PasswordInput
               name="password"
               required
               autoComplete="current-password"

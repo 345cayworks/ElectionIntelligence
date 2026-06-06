@@ -7,6 +7,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { Card, CardBody, CardHeader, StatCard } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Field, Select } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Badge } from "@/components/ui/Badge";
 import { PageHeader } from "@/components/layout/SidebarLayout";
 import {
@@ -189,9 +190,8 @@ export default async function SuperAdminSettingsPage({
                 <Input name="email" type="email" required placeholder="new@example.com" />
               </Field>
               <Field label={<Label>Temporary password</Label>}>
-                <Input
+                <PasswordInput
                   name="password"
-                  type="password"
                   required
                   minLength={10}
                   placeholder="Min 10 characters"
@@ -238,9 +238,8 @@ export default async function SuperAdminSettingsPage({
                 — never displayed. To rotate, update the host secret and redeploy.
               </div>
               <form action={rotateMasterKey} className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <Input
+                <PasswordInput
                   name="currentKey"
-                  type="password"
                   placeholder="Enter current master key to confirm"
                   required
                 />
