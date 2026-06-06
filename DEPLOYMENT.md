@@ -69,6 +69,7 @@ Add the following environment variables in the Netlify UI:
 | `DATABASE_URL` | yes | Production database connection string |
 | `SUPER_ADMIN_EMAIL` | yes | Seeds the initial SuperAdmin on first boot |
 | `SUPERADMIN_MASTER_KEY` | yes | Server-only. Min 16 chars. Never expose. |
+| `SCHEDULED_SYNC_TOKEN` | optional | Server-only. Min 16 chars. Required if you want to call `/api/scheduled/sync-portal` from outside an authenticated session (Netlify scheduled functions, GitHub Actions cron, etc.). |
 | `AD_ENGINE_KEY` | optional | Server-only Cayworks Ads Engine key |
 | `AD_ENGINE_BASE_URL` | optional | Defaults to `https://ads.cayworks.com` |
 | `AD_ENGINE_PLATFORM` | optional | Slug registered with the Ads Engine |
@@ -141,7 +142,70 @@ grep -R --exclude-dir=node_modules --exclude-dir=.next "<PREFIX>" . | wc -l
 # expected: 0
 ```
 
-## 6. Backup and retention
+## 6. Ingesting Cayman Islands election data
+
+### Election cycle, candidates, results — `npm run import:2025`
+
+A reproducible importer reads `data/2025-general-election.json` and
+upserts a single `ElectionCycle` (`id: "ge-2025"`), one `Candidate` per
+constituency entry, and an `ElectionResult` row for each candidate that
+has a `votes` value. Idempotent — re-running updates existing rows by
+`(electionCycleId, constituencyId, shorthandCode)`.
+
+```bash
+# from your laptop, against the production DB (read-only operations
+# happen against this connection, no harm if you abort)
+DATABASE_URL="postgresql://..." npm run import:2025
+```
+
+The JSON file ships with a small set of known winners (East End,
+Cayman Brac East, etc.) — fill in the rest from the official
+Declaration of Results PDF or news outlets before re-running.
+
+### Portal scraper — `POST /api/scheduled/sync-portal`
+
+Best-effort ingest of `portal.elections.ky` candidate and polling
+station pages. The portal sits behind Cloudflare bot protection and
+frequently returns 403 to non-browser User-Agents — when that happens
+the endpoint records a WARN audit entry and returns a 200 with a
+diagnostic summary. Run it again later or fall back to manual entry
+via `/admin/polling-stations`.
+
+**Manual trigger** — from any signed-in SuperAdmin session:
+
+```bash
+curl -X POST https://caymanelectionintell.cayworks.com/api/scheduled/sync-portal \
+  -H "Cookie: cw_session=YOUR_SESSION_COOKIE"
+```
+
+**Automated trigger** — set `SCHEDULED_SYNC_TOKEN` (≥16 chars) on
+Netlify, then have an external cron (GitHub Actions, EasyCron, Better
+Uptime) POST hourly/daily:
+
+```bash
+curl -X POST https://caymanelectionintell.cayworks.com/api/scheduled/sync-portal \
+  -H "X-Sync-Token: $SCHEDULED_SYNC_TOKEN"
+```
+
+The response shape:
+
+```json
+{
+  "startedAt": "2025-06-06T...",
+  "candidatesFetched": { "ok": true, "status": 200, "parsed": 80 },
+  "pollingStationsFetched": { "ok": false, "status": 403, "parsed": null, "reason": "http_403" },
+  "candidatesUpserted": 0,
+  "pollingStationsUpserted": 0,
+  "warnings": ["polling stations: fetch failed (http_403)"]
+}
+```
+
+`candidatesUpserted` is intentionally 0 — scraped candidate names
+don't carry the canonical `shorthandCode`, so a snapshot is stored in
+`PlatformSetting` (`portal:candidates:lastScrape`) for human review
+and the JSON importer is the authoritative writer.
+
+## 7. Backup and retention
 
 `/admin/data-retention` configures retention windows for audit logs
 and canvass visits. The page also exposes a manual "Run visit

@@ -2,7 +2,11 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/audit/log";
-import { DEFAULT_ISSUE_TAGS, CAYMAN_CONSTITUENCIES } from "@/lib/constants";
+import {
+  DEFAULT_ISSUE_TAGS,
+  CAYMAN_CONSTITUENCIES,
+  CAYMAN_PARTIES,
+} from "@/lib/constants";
 
 // Ensures a SuperAdmin user exists and reference data is seeded.
 // Called lazily from server contexts; safe to call repeatedly.
@@ -32,6 +36,7 @@ async function run(): Promise<void> {
   await seedSuperAdmin();
   await seedIssueTags();
   await seedConstituencies();
+  await seedParties();
 }
 
 async function seedSuperAdmin(): Promise<void> {
@@ -132,6 +137,39 @@ async function seedSuperAdmin(): Promise<void> {
     console.warn(
       `[bootstrap] SuperAdmin created: ${email}. Temporary password: ${tempPassword}`,
     );
+  }
+}
+
+// Lazily seed the registered political parties. Idempotent: skips
+// parties whose `code` already exists, so operator edits to colour,
+// leader, or activation state survive subsequent boots.
+async function seedParties(): Promise<void> {
+  const existing = await prisma.party.findMany({ select: { code: true } });
+  const existingCodes = new Set(existing.map((p) => p.code));
+
+  let inserted = 0;
+  for (const p of CAYMAN_PARTIES) {
+    if (existingCodes.has(p.code)) continue;
+    await prisma.party
+      .create({
+        data: {
+          code: p.code,
+          name: p.name,
+          shortName: p.shortName,
+          color: p.color,
+          leaderName: p.leaderName ?? null,
+        },
+      })
+      .then(() => {
+        inserted += 1;
+      })
+      .catch(() => {
+        /* race or unique-violation - safe to ignore */
+      });
+  }
+  if (inserted > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`[bootstrap] seeded ${inserted} political part(ies)`);
   }
 }
 

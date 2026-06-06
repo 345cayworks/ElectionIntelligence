@@ -131,6 +131,38 @@ export const DEFAULT_AD_PLACEMENTS = [
   { key: "elector_profile_sidebar", description: "Sidebar slot on elector profile" },
 ];
 
+// Registered political parties in the Cayman Islands. Lazy-seeded on
+// bootstrap; the operator can edit `color`, `leaderName`, etc. via the
+// /admin/parties page without the seed undoing those changes (idempotent
+// match by `code`). Independent candidates have no Party row - their
+// `partyId` is null.
+export const CAYMAN_PARTIES: Array<{
+  code: string;
+  name: string;
+  shortName: string;
+  color: string;
+  leaderName?: string;
+}> = [
+  {
+    code: "PPM",
+    name: "People's Progressive Movement",
+    shortName: "PPM",
+    color: "#0F4C8A",
+  },
+  {
+    code: "TCCP",
+    name: "The Caymanian Community Party",
+    shortName: "TCCP",
+    color: "#1F8A3A",
+  },
+  {
+    code: "CINP",
+    name: "Cayman Islands National Party",
+    shortName: "CINP",
+    color: "#C2272D",
+  },
+];
+
 // The 19 official Cayman Islands constituencies (post-2021 boundary
 // redistribution). Codes follow the short official abbreviations used
 // by the Elections Office (WBN, GTC, RED, etc.). Sister Islands codes

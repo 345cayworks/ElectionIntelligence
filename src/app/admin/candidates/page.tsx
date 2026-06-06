@@ -18,7 +18,8 @@ const CandidateSchema = z.object({
   constituencyId: z.string().min(1),
   name: z.string().min(2).max(120),
   shorthandCode: z.string().min(1).max(20),
-  party: z.string().max(80).optional(),
+  partyId: z.string().optional(),
+  partyName: z.string().max(80).optional(),
   isPrimary: z.preprocess((v) => v === "on" || v === "true", z.boolean()).optional(),
 });
 
@@ -29,13 +30,17 @@ export default async function CandidatesPage({
 }) {
   await requireCampaignManager();
 
-  const [candidates, cycles, constituencies] = await Promise.all([
+  const [candidates, cycles, constituencies, parties] = await Promise.all([
     prisma.candidate.findMany({
       orderBy: { name: "asc" },
-      include: { constituency: true, electionCycle: true },
+      include: { constituency: true, electionCycle: true, party: true },
     }),
     prisma.electionCycle.findMany({ orderBy: { electionDate: "desc" } }),
     prisma.constituency.findMany({ orderBy: { name: "asc" } }),
+    prisma.party.findMany({
+      where: { active: true },
+      orderBy: { code: "asc" },
+    }),
   ]);
 
   return (
@@ -73,26 +78,43 @@ export default async function CandidatesPage({
                     <TH>Primary</TH>
                   </THead>
                   <TBody>
-                    {candidates.map((c) => (
-                      <TR key={c.id}>
-                        <TD>{c.name}</TD>
-                        <TD>
-                          <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
-                            {c.shorthandCode}
-                          </code>
-                        </TD>
-                        <TD>{c.party ?? "—"}</TD>
-                        <TD>{c.constituency.name}</TD>
-                        <TD>{c.electionCycle.name}</TD>
-                        <TD>
-                          {c.isPrimaryCampaignCandidate ? (
-                            <Badge tone="green">Yes</Badge>
-                          ) : (
-                            <Badge tone="gray">No</Badge>
-                          )}
-                        </TD>
-                      </TR>
-                    ))}
+                    {candidates.map((c) => {
+                      const partyLabel =
+                        c.party?.shortName ?? c.party?.name ?? c.partyName ?? "Independent";
+                      const partyColor = c.party?.color;
+                      return (
+                        <TR key={c.id}>
+                          <TD>{c.name}</TD>
+                          <TD>
+                            <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">
+                              {c.shorthandCode}
+                            </code>
+                          </TD>
+                          <TD>
+                            {partyColor ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  className="inline-block h-2 w-2 rounded-full"
+                                  style={{ backgroundColor: partyColor }}
+                                />
+                                {partyLabel}
+                              </span>
+                            ) : (
+                              partyLabel
+                            )}
+                          </TD>
+                          <TD>{c.constituency.name}</TD>
+                          <TD>{c.electionCycle.name}</TD>
+                          <TD>
+                            {c.isPrimaryCampaignCandidate ? (
+                              <Badge tone="green">Yes</Badge>
+                            ) : (
+                              <Badge tone="gray">No</Badge>
+                            )}
+                          </TD>
+                        </TR>
+                      );
+                    })}
                   </TBody>
                 </Table>
               )}
@@ -135,8 +157,24 @@ export default async function CandidatesPage({
                 >
                   <Input name="shorthandCode" required maxLength={20} />
                 </Field>
-                <Field label={<Label>Party</Label>}>
-                  <Input name="party" placeholder="Optional" />
+                <Field
+                  label={<Label>Party</Label>}
+                  hint="Pick Independent for unaffiliated candidates"
+                >
+                  <Select name="partyId">
+                    <option value="">Independent</option>
+                    {parties.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.shortName ?? p.code} — {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field
+                  label={<Label>Party name (override)</Label>}
+                  hint="Only fill in if the party isn't in the list above"
+                >
+                  <Input name="partyName" placeholder="Optional" />
                 </Field>
                 <label className="flex items-center gap-2 text-xs text-gray-700">
                   <input type="checkbox" name="isPrimary" />
@@ -160,7 +198,8 @@ async function createCandidate(formData: FormData) {
     constituencyId: formData.get("constituencyId"),
     name: formData.get("name"),
     shorthandCode: formData.get("shorthandCode"),
-    party: formData.get("party") || undefined,
+    partyId: formData.get("partyId") || undefined,
+    partyName: formData.get("partyName") || undefined,
     isPrimary: formData.get("isPrimary") === "on",
   });
   if (!parsed.success) {
@@ -176,7 +215,8 @@ async function createCandidate(formData: FormData) {
         constituencyId: parsed.data.constituencyId,
         name: parsed.data.name,
         shorthandCode: parsed.data.shorthandCode,
-        party: parsed.data.party ?? null,
+        partyId: parsed.data.partyId ?? null,
+        partyName: parsed.data.partyName ?? null,
         isPrimaryCampaignCandidate: !!parsed.data.isPrimary,
       },
     });
@@ -188,6 +228,7 @@ async function createCandidate(formData: FormData) {
       metadata: {
         name: created.name,
         code: created.shorthandCode,
+        partyId: created.partyId,
       },
     });
   } catch {

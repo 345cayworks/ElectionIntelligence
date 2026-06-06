@@ -1,0 +1,96 @@
+{
+  "_doc": "Template for the 2025 Cayman Islands General Election. Fill in the candidates and results arrays per constituency, then run `npm run import:2025`. The importer is idempotent - re-running updates existing rows by (electionCycle + constituency + shorthandCode). Source: portal.elections.ky/index.php/candidates-agents/2025-candidates plus the official Declaration of Results PDF (or news outlets until the PDF is published).",
+  "cycle": {
+    "name": "2025 General Election",
+    "electionDate": "2025-04-30",
+    "status": "COMPLETED",
+    "notes": "Election held 30 April 2025. 80 candidates across 19 constituencies."
+  },
+  "constituencies": [
+    {
+      "code": "RED",
+      "candidates": [
+        {
+          "name": "Marco Archer",
+          "shorthandCode": "MA",
+          "partyCode": "PPM",
+          "votes": null,
+          "isWinner": false
+        },
+        {
+          "name": "Natasha Whitelocke",
+          "shorthandCode": "NW",
+          "partyCode": "TCCP",
+          "votes": null,
+          "isWinner": false
+        }
+      ],
+      "_doc": "Replace the placeholder list above with the actual nominated candidates for Red Bay. Repeat the pattern for the other 18 constituencies. Set `partyCode` to null for independents. Set `votes` once the Declaration is published; leave null for not-yet-known."
+    },
+    {
+      "code": "EE",
+      "candidates": [
+        {
+          "name": "Isaac Rankine",
+          "shorthandCode": "IR",
+          "partyCode": null,
+          "votes": null,
+          "isWinner": true,
+          "votesPercent": 52.8
+        }
+      ]
+    },
+    {
+      "code": "CBE",
+      "candidates": [
+        {
+          "name": "Juliana O'Connor-Connolly",
+          "shorthandCode": "JOC",
+          "partyCode": "PPM",
+          "votes": null,
+          "isWinner": true,
+          "votesPercent": 52.3
+        }
+      ]
+    },
+    {
+      "code": "WBN",
+      "candidates": [
+        {
+          "name": "Rolston Anglin",
+          "shorthandCode": "RA",
+          "partyCode": null,
+          "votes": null,
+          "isWinner": true,
+          "votesPercent": 50.3
+        }
+      ]
+    },
+    {
+      "code": "NEW",
+      "candidates": [
+        {
+          "name": "Wayne Panton",
+          "shorthandCode": "WP",
+          "partyCode": "TCCP",
+          "votes": null,
+          "isWinner": true,
+          "votesPercent": 48.5
+        }
+      ]
+    },
+    {
+      "code": "BTW",
+      "candidates": [
+        {
+          "name": "Chris Saunders",
+          "shorthandCode": "CS",
+          "partyCode": null,
+          "votes": null,
+          "isWinner": true,
+          "votesPercent": 43.8
+        }
+      ]
+    }
+  ]
+}

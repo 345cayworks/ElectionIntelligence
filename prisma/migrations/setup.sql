@@ -94,12 +94,30 @@ CREATE TABLE "Constituency" (
 );
 
 -- CreateTable
+CREATE TABLE "Party" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "shortName" TEXT,
+    "color" TEXT,
+    "leaderName" TEXT,
+    "foundedAt" TIMESTAMP(3),
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Party_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Candidate" (
     "id" TEXT NOT NULL,
     "electionCycleId" TEXT NOT NULL,
     "constituencyId" TEXT NOT NULL,
+    "partyId" TEXT,
     "name" TEXT NOT NULL,
-    "party" TEXT,
+    "partyName" TEXT,
     "shorthandCode" TEXT NOT NULL,
     "isPrimaryCampaignCandidate" BOOLEAN NOT NULL DEFAULT false,
     "notes" TEXT,
@@ -107,6 +125,42 @@ CREATE TABLE "Candidate" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Candidate_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PollingStation" (
+    "id" TEXT NOT NULL,
+    "constituencyId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT,
+    "address" TEXT,
+    "city" TEXT,
+    "notes" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PollingStation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ElectionResult" (
+    "id" TEXT NOT NULL,
+    "electionCycleId" TEXT NOT NULL,
+    "constituencyId" TEXT NOT NULL,
+    "candidateId" TEXT NOT NULL,
+    "votesReceived" INTEGER NOT NULL,
+    "votesPercent" DOUBLE PRECISION,
+    "rank" INTEGER,
+    "isWinner" BOOLEAN NOT NULL DEFAULT false,
+    "totalValidVotes" INTEGER,
+    "totalRegistered" INTEGER,
+    "turnoutPercent" DOUBLE PRECISION,
+    "source" TEXT,
+    "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ElectionResult_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -334,13 +388,34 @@ CREATE INDEX "ElectionCycle_status_idx" ON "ElectionCycle"("status");
 CREATE UNIQUE INDEX "Constituency_code_key" ON "Constituency"("code");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Party_code_key" ON "Party"("code");
+
+-- CreateIndex
 CREATE INDEX "Candidate_constituencyId_idx" ON "Candidate"("constituencyId");
 
 -- CreateIndex
 CREATE INDEX "Candidate_electionCycleId_idx" ON "Candidate"("electionCycleId");
 
 -- CreateIndex
+CREATE INDEX "Candidate_partyId_idx" ON "Candidate"("partyId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Candidate_electionCycleId_constituencyId_shorthandCode_key" ON "Candidate"("electionCycleId", "constituencyId", "shorthandCode");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PollingStation_code_key" ON "PollingStation"("code");
+
+-- CreateIndex
+CREATE INDEX "PollingStation_constituencyId_idx" ON "PollingStation"("constituencyId");
+
+-- CreateIndex
+CREATE INDEX "ElectionResult_electionCycleId_constituencyId_idx" ON "ElectionResult"("electionCycleId", "constituencyId");
+
+-- CreateIndex
+CREATE INDEX "ElectionResult_isWinner_idx" ON "ElectionResult"("isWinner");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ElectionResult_electionCycleId_candidateId_key" ON "ElectionResult"("electionCycleId", "candidateId");
 
 -- CreateIndex
 CREATE INDEX "ImportBatch_electionCycleId_idx" ON "ImportBatch"("electionCycleId");
@@ -455,6 +530,21 @@ ALTER TABLE "Candidate" ADD CONSTRAINT "Candidate_electionCycleId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "Candidate" ADD CONSTRAINT "Candidate_constituencyId_fkey" FOREIGN KEY ("constituencyId") REFERENCES "Constituency"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Candidate" ADD CONSTRAINT "Candidate_partyId_fkey" FOREIGN KEY ("partyId") REFERENCES "Party"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PollingStation" ADD CONSTRAINT "PollingStation_constituencyId_fkey" FOREIGN KEY ("constituencyId") REFERENCES "Constituency"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ElectionResult" ADD CONSTRAINT "ElectionResult_electionCycleId_fkey" FOREIGN KEY ("electionCycleId") REFERENCES "ElectionCycle"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ElectionResult" ADD CONSTRAINT "ElectionResult_constituencyId_fkey" FOREIGN KEY ("constituencyId") REFERENCES "Constituency"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ElectionResult" ADD CONSTRAINT "ElectionResult_candidateId_fkey" FOREIGN KEY ("candidateId") REFERENCES "Candidate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ImportBatch" ADD CONSTRAINT "ImportBatch_electionCycleId_fkey" FOREIGN KEY ("electionCycleId") REFERENCES "ElectionCycle"("id") ON DELETE SET NULL ON UPDATE CASCADE;

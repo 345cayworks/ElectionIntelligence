@@ -39,6 +39,8 @@ export function AdminShell({
       items: [
         { href: "/admin/elections", label: "Elections" },
         { href: "/admin/constituencies", label: "Constituencies" },
+        { href: "/admin/polling-stations", label: "Polling Stations" },
+        { href: "/admin/parties", label: "Parties" },
         { href: "/admin/candidates", label: "Candidates" },
         ...(canImportElectors(user)
           ? [{ href: "/admin/imports", label: "Imports" }]

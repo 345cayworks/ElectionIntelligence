@@ -111,6 +111,7 @@ model ElectionCycle {
   electorPoliticalStatuses ElectorPoliticalStatus[]
   assignments            CanvassAssignment[]
   followUpTasks          FollowUpTask[]
+  electionResults        ElectionResult[]
 
   @@index([status])
 }
@@ -130,6 +131,28 @@ model Constituency {
   importBatches          ImportBatch[]
   canvassVisits          CanvassVisit[]
   assignments            CanvassAssignment[]
+  pollingStations        PollingStation[]
+  electionResults        ElectionResult[]
+}
+
+// Registered political parties (post-2021 Election Law). Lazy-seeded on
+// bootstrap from CAYMAN_PARTIES. Candidates standing as independents have
+// `partyId = null`; party affiliation is intentionally NOT modelled as a
+// required field.
+model Party {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique  // PPM, TCCP, CINP, etc.
+  shortName   String?
+  color       String?  // Hex (#RRGGBB) for visual differentiation in the UI
+  leaderName  String?
+  foundedAt   DateTime?
+  active      Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidates  Candidate[]
 }
 
 model Candidate {
@@ -138,8 +161,10 @@ model Candidate {
   electionCycle             ElectionCycle @relation(fields: [electionCycleId], references: [id], onDelete: Cascade)
   constituencyId            String
   constituency              Constituency  @relation(fields: [constituencyId], references: [id], onDelete: Cascade)
+  partyId                   String?
+  party                     Party?   @relation(fields: [partyId], references: [id], onDelete: SetNull)
   name                      String
-  party                     String?
+  partyName                 String?  // Free-text fallback if no Party row matches (legacy/import)
   shorthandCode             String
   isPrimaryCampaignCandidate Boolean @default(false)
   notes                     String?
@@ -147,10 +172,59 @@ model Candidate {
   updatedAt                 DateTime @updatedAt
 
   declarations              ElectorPoliticalStatus[]
+  electionResults           ElectionResult[]
 
   @@unique([electionCycleId, constituencyId, shorthandCode])
   @@index([constituencyId])
   @@index([electionCycleId])
+  @@index([partyId])
+}
+
+// Single polling station within a constituency. Address fields kept as
+// freeform strings - the source data on portal.elections.ky is published
+// per election cycle as a flat list.
+model PollingStation {
+  id             String   @id @default(cuid())
+  constituencyId String
+  constituency   Constituency @relation(fields: [constituencyId], references: [id], onDelete: Cascade)
+  name           String
+  code           String?  @unique  // Optional official code from the Elections Office (e.g. "WBN-01")
+  address        String?
+  city           String?
+  notes          String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([constituencyId])
+}
+
+// Per-candidate result for a given ElectionCycle + Constituency. Populated
+// from the Elections Office Declaration of Results (or news sources before
+// the official PDF lands). Each Candidate row gets exactly one
+// ElectionResult per cycle - the unique constraint enforces that.
+model ElectionResult {
+  id                String   @id @default(cuid())
+  electionCycleId   String
+  electionCycle     ElectionCycle @relation(fields: [electionCycleId], references: [id], onDelete: Cascade)
+  constituencyId    String
+  constituency      Constituency @relation(fields: [constituencyId], references: [id], onDelete: Cascade)
+  candidateId       String
+  candidate         Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  votesReceived     Int
+  votesPercent      Float?
+  rank              Int?     // 1 = winner, 2 = runner-up, etc.
+  isWinner          Boolean  @default(false)
+  totalValidVotes   Int?     // Constituency total (denormalized for fast tally queries)
+  totalRegistered   Int?
+  turnoutPercent    Float?
+  source            String?  // "official" | "news" | "preliminary"
+  recordedAt        DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([electionCycleId, candidateId])
+  @@index([electionCycleId, constituencyId])
+  @@index([isWinner])
 }
 
 // =====================================================================
