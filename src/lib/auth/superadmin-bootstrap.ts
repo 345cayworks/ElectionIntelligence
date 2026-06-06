@@ -72,15 +72,19 @@ async function seedSuperAdmin(): Promise<void> {
       });
     }
 
-    // Reset password from the env var only if the user is still in the
-    // post-bootstrap "must reset" state (i.e. they've never signed in to
-    // rotate it themselves). This makes the seed-password env var usable
-    // even when the User row was created on a previous deploy without it.
-    if (operatorProvidedPassword && existing.forcePasswordReset) {
+    // Reset password from the env var when the user has never signed in
+    // successfully. `lastLoginAt` (not `forcePasswordReset`) is the gate
+    // because the latter is a UX flag that can be cleared in many places
+    // and would silently disable recovery; `lastLoginAt == null` is the
+    // strict invariant for "this account has never been used."
+    //
+    // Once the operator has signed in once, the bootstrap will never
+    // overwrite the password again, even if the env var is still set.
+    if (operatorProvidedPassword && existing.lastLoginAt === null) {
       const passwordHash = await hashPassword(seedPassword);
       await prisma.user.update({
         where: { id: existing.id },
-        data: { passwordHash },
+        data: { passwordHash, forcePasswordReset: true },
       });
       await recordAudit({
         actorUserId: null,
@@ -92,7 +96,12 @@ async function seedSuperAdmin(): Promise<void> {
       });
       // eslint-disable-next-line no-console
       console.warn(
-        `[bootstrap] SuperAdmin password reset from SUPER_ADMIN_SEED_PASSWORD. Sign in, then remove the env var.`,
+        `[bootstrap] SuperAdmin password reset from env (SUPER_ADMIN_SEED_PASSWORD or SUPERADMIN_MASTER_KEY). Sign in, then remove or rotate the env var.`,
+      );
+    } else if (operatorProvidedPassword) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[bootstrap] SuperAdmin already has a lastLoginAt - skipping env-based password reset. Use /api/admin/recover-superadmin to recover.`,
       );
     }
     return;
